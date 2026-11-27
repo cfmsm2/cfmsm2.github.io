@@ -749,7 +749,15 @@ function botMove() {
       renderBoard();
     });
 
+    initializeSnappy()
+  .then(() => {
+    console.log("Snappy is ready!");
     renderBoard();
+  })
+  .catch(error => {
+    console.error("Failed to initialize Snappy:", error);
+    alert("Snappy AI failed to load. Check the browser console.");
+  });
   </script>
 </body>
 </html>
