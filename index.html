@@ -190,7 +190,18 @@ const wasmImports = {
       currentMoves = game.moves({ verbose: true });
       return currentMoves.length;
     },
-
+	abort(message, fileName, lineNumber, columnNumber) {
+      console.error("Snappy WASM aborted:", {
+        message,
+        fileName,
+        lineNumber,
+        columnNumber
+      });
+    },
+    getMoveCount() {
+      currentMoves = game.moves({ verbose: true });
+      return currentMoves.length;
+    },
     getMoveFrom(index) {
       return squareToIndex(currentMoves[index].from);
     },
