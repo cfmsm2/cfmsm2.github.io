@@ -156,7 +156,134 @@
     import { Chess } from
     "https://cdn.jsdelivr.net/npm/chess.js@1.4.0/+esm";
     const game = new Chess();
-	// Change these URLs to your own asset hosting locations.
+	
+let snappyWasm = null;
+
+const pieceCodes = {
+  p: 1,
+  n: 2,
+  b: 3,
+  r: 4,
+  q: 5,
+  k: 6
+};
+
+let currentMoves = [];
+
+function squareToIndex(square) {
+  const file = square.charCodeAt(0) - 97;
+  const rank = Number(square[1]) - 1;
+
+  return rank * 8 + file;
+}
+
+function indexToSquare(index) {
+  const file = String.fromCharCode(97 + (index % 8));
+  const rank = Math.floor(index / 8) + 1;
+
+  return file + rank;
+}
+
+const wasmImports = {
+  env: {
+    getMoveCount() {
+      currentMoves = game.moves({ verbose: true });
+      return currentMoves.length;
+    },
+
+    getMoveFrom(index) {
+      return squareToIndex(currentMoves[index].from);
+    },
+
+    getMoveTo(index) {
+      return squareToIndex(currentMoves[index].to);
+    },
+
+    getMovePromotion(index) {
+      const promotion = currentMoves[index].promotion;
+
+      if (!promotion) return 0;
+
+      return {
+        q: 1,
+        r: 2,
+        b: 3,
+        n: 4
+      }[promotion] || 0;
+    },
+
+    makeMove(from, to, promotion) {
+      try {
+        const move = {
+          from: indexToSquare(from),
+          to: indexToSquare(to)
+        };
+
+        if (promotion !== 0) {
+          move.promotion = {
+            1: "q",
+            2: "r",
+            3: "b",
+            4: "n"
+          }[promotion];
+        }
+
+        game.move(move);
+        return 1;
+      } catch {
+        return 0;
+      }
+    },
+
+    undoMove() {
+      game.undo();
+    },
+
+    pieceAt(square) {
+      const piece = game.get(indexToSquare(square));
+
+      if (!piece) return 0;
+
+      const value = pieceCodes[piece.type];
+
+      return piece.color === "b"
+        ? value
+        : -value;
+    },
+
+    getTurn() {
+      return game.turn() === "b" ? 1 : -1;
+    },
+
+    isCheckmate() {
+      return game.isCheckmate() ? 1 : 0;
+    },
+
+    isDraw() {
+      return game.isDraw() ? 1 : 0;
+    }
+  }
+};
+
+async function initializeSnappy() {
+  const response = await fetch("./snappy.wasm");
+
+  if (!response.ok) {
+    throw new Error("Could not load snappy.wasm");
+  }
+
+  const bytes = await response.arrayBuffer();
+
+  const result = await WebAssembly.instantiate(
+    bytes,
+    wasmImports
+  );
+
+  snappyWasm = result.instance.exports;
+
+  console.log("Snappy WebAssembly AI initialized!");
+}
+
 	const ASSET_BASE_URL = "https://images.chesscomfiles.com/chess-themes/pieces/neo/300/";
 	const SOUND_BASE_URL = "http://images.chesscomfiles.com/chess-themes/sounds/_MP3_/default/";
 
@@ -373,21 +500,39 @@
 	}
 
 	// Select the highest-scoring move.
-	function botMove() {
-	  const rankedMoves = _botMove(SEARCH_DEPTH);
 
-	  if (rankedMoves.length === 0) return null;
+function botMove() {
+  if (!snappyWasm) {
+    throw new Error("Snappy AI is not initialized.");
+  }
 
-	  console.table(
-	    rankedMoves.map(({ move, score }) => ({
-	      move: move.from + move.to,
-	      promotion: move.promotion || "",
-	      score
-	    }))
-	  );
+  const result = snappyWasm.bestMove(SEARCH_DEPTH);
 
-	  return rankedMoves[0].move;
-	}
+  if (result === -1) return null;
+
+  const from = result & 63;
+  const to = (result >> 6) & 63;
+  const promotion = (result >> 12) & 7;
+
+  const fromSquare = indexToSquare(from);
+  const toSquare = indexToSquare(to);
+
+  const promotionTypes = {
+    1: "q",
+    2: "r",
+    3: "b",
+    4: "n"
+  };
+
+  const promotionType = promotionTypes[promotion];
+
+  return game.moves({ verbose: true }).find(move =>
+    move.from === fromSquare &&
+    move.to === toSquare &&
+    (move.promotion || undefined) === promotionType
+  ) || null;
+}
+
 
 
 
