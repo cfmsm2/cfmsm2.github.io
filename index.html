@@ -243,17 +243,7 @@
 		const movingValue = PIECE_VALUES[movingPiece.type] || 0;
 		const opponent = game.turn() === "w" ? "b" : "w";
 		if (!isCapture) {
-			applyMove(move);
-			const isUnsafe = game.isAttacked(move.to, game.turn());
-			game.undo();
-			if (isUnsafe) {
-				moveValue-=movingValue;
-				continue;
-			} else if (game.isAttacked(move.from, opponent)) {
-					moveValue+=movingValue;
-			}
 			const distance = distanceToCenter(move);
-
 			if (distance < lowestDistance && movingPiece?.type !== "k") {
 			  lowestDistance = distance;
 			  lowestDistanceMove = move;
@@ -262,31 +252,9 @@
 			}
         else {
           const capturedPiece = game.get(move.to);
-
           if (capturedPiece && movingPiece) {
             const capturedValue = PIECE_VALUES[capturedPiece.type] || 0;
-
-            applyMove(move);
-            const isDefended = game.isAttacked(move.to, game.turn());
-            game.undo();
-
-            if (isDefended && movingValue > capturedValue) {
-              continue;
-            }
-			if (isDefended) {
-				const tradeValue = capturedValue - movingValue;
-				moveValue += tradeValue;
-				if (tradeValue >= 6 || tradeValue <= -3) {
-					continue;
-				}
-			}
-			else {
-				moveValue += capturedValue;
-				if (capturedValue >= 5) { 
-					continue;
-				}
-			}
-          }
+			moveValue+=capturedValue;
         }
 		const isPromotion = move && move.flags.includes('p')
 		if (isPromotion) {
@@ -297,15 +265,6 @@
 		}
 		const currentMoveCount = game.moves({ verbose: true })	
 		  .filter(m => m.from === move.from).length;
-		applyMove(move);
-		game._turn="b"
-		const allLegalMoves = game.moves({ verbose: true });
-		const isPawn = movingPiece.type == "p"
-		const moveCount = (allLegalMoves.filter(
-		  m => m.from === move.to
-		).length) - ((currentMoveCount * !isPawn) + ((currentMoveCount / 4) * isPawn));
-		game._turn="w"
-		game.undo();
 
 		moveValue += moveCount / movingValue;
 
