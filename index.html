@@ -219,76 +219,90 @@
       });
     }
 
-    function botMove() {
-	  const stamp = Date.now()
-      const legalMoves = game.moves({ verbose: true });
-      for (const move of legalMoves) {
+    
+function botMove() {
+    const stamp = Date.now();
+    const legalMoves = game.moves({ verbose: true });
+    for (const move of legalMoves) {
         applyMove(move);
+
         const isMate = game.isCheckmate();
+
         game.undo();
 
         if (isMate) return move;
-      }
-      let bestMove = null;
-      let bestValue = -1;
-      let lowestDistance = 99;
-      let lowestDistanceMove = null;
-      let lowestDistanceValue = -1;
-      for (const move of legalMoves) {
-        let moveValue = 0.0;
-
-        const isCapture =
-          move.flags.includes("c") || move.flags.includes("e");
-		const movingPiece = game.get(move.from);
-		const movingValue = PIECE_VALUES[movingPiece.type] || 0;
-		const opponent = game.turn() === "w" ? "b" : "w";
-		if (!isCapture) {
-			const distance = distanceToCenter(move);
-			if (distance < lowestDistance && movingPiece?.type !== "k") {
-			  lowestDistance = distance;
-			  lowestDistanceMove = move;
-			  lowestDistanceValue = moveValue;
-			  }
-			}
-        else {
-          const capturedPiece = game.get(move.to);
-          if (capturedPiece && movingPiece) {
-            const capturedValue = PIECE_VALUES[capturedPiece.type] || 0;
-			moveValue+=capturedValue;
-        }
-		const isPromotion = move && move.flags.includes('p')
-		if (isPromotion) {
-			moveValue+=9
-		}
-		else if (movingPiece.type == "p" && (move.from.endsWith('2') || move.from.endsWith('7'))) {
-			moveValue+=0.2;
-		}
-		const currentMoveCount = game.moves({ verbose: true })	
-		  .filter(m => m.from === move.from).length;
-
-		moveValue += moveCount / movingValue;
-
-        if (moveValue > bestValue) {
-          bestValue = moveValue;
-          bestMove = move;
-        }
-		console.log({
-		  move: move.from + move.to,
-		  isPawn,
-		  moveValue
-		});
-      }
-	  console.log("=".repeat(20))
-	  console.log(Date.now() - stamp)
-	  console.log("=".repeat(20))
-      if (lowestDistanceMove &&
-          lowestDistanceValue + 0 > bestValue) {
-        bestMove = lowestDistanceMove;
-      }
-
-      if (bestMove) return bestMove;
-      return legalMoves[Math.floor(Math.random() * legalMoves.length)];
     }
+    let bestMove = null;
+    let bestValue = -1;
+    let lowestDistance = 99;
+    let lowestDistanceMove = null;
+    let lowestDistanceValue = -1;
+    for (const move of legalMoves) {
+        let moveValue = 0;
+        const movingPiece = game.get(move.from);
+        if (!movingPiece) continue;
+        const movingValue = PIECE_VALUES[movingPiece.type] || 1;
+        const isCapture =
+            move.flags.includes("c") ||
+            move.flags.includes("e");
+        const isPawn = movingPiece.type === "p";
+        if (!isCapture && movingPiece.type !== "k") {
+            const distance = distanceToCenter(move);
+
+            if (distance < lowestDistance) {
+                lowestDistance = distance;
+                lowestDistanceMove = move;
+                lowestDistanceValue = moveValue;
+            }
+        }
+        if (isCapture) {
+            const capturedPiece = game.get(move.to);
+
+            if (capturedPiece) {
+                moveValue +=
+                    PIECE_VALUES[capturedPiece.type] || 0;
+            }
+        }
+        if (move.flags.includes("p")) {
+            moveValue += 9;
+        }
+        if (
+            isPawn &&
+            (move.from.endsWith("2") ||
+             move.from.endsWith("7"))
+        ) {
+            moveValue += 0.2;
+        }
+        const currentMoveCount = game.moves({
+            verbose: true
+        }).filter(m => m.from === move.from).length;
+        moveValue += currentMoveCount / movingValue;
+        if (moveValue > bestValue) {
+            bestValue = moveValue;
+            bestMove = move;
+        }
+        console.log({
+            move: move.from + move.to,
+            isPawn,
+            moveValue
+        });
+    }
+    console.log("====================");
+    console.log(Date.now() - stamp);
+    console.log("====================");
+    if (
+        lowestDistanceMove &&
+        lowestDistanceValue > bestValue
+    ) {
+        bestMove = lowestDistanceMove;
+    }
+
+    if (bestMove) return bestMove;
+
+    return legalMoves[
+        Math.floor(Math.random() * legalMoves.length)
+    ];
+}
 
 
 	function renderBoard() {
